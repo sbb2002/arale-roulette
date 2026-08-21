@@ -721,9 +721,7 @@ let velocity = 0;       // deg / sec
 let decelTimer = 0;     // seconds spent slowing down without a new click
 let decelRollDone = false; // whether the 2s-deceleration roll already happened this episode
 let stormStartAt = null;    // timestamp when the storm sound most recently started playing
-let stormDrop7Done = false;  // whether the 7s-into-storm forced ball already dropped
-let stormDrop12Done = false; // whether the 12s-into-storm forced ball already dropped
-let stormDropAllDone = false; // whether the 18s-into-storm "drop everything" chain already started
+let stormDropIndex = 0;      // how many of STORM_DROP_TIMES have already fired this storm episode
 let stormCapDoubled = false; // whether the 9s-into-storm speed-cap doubling already happened
 let stormFinishNaturally = false; // once true, let the storm mp3 play out instead of fading it early
 let velocityCap = 0;         // current max velocity (doubles mid-storm); set to MAX_VELOCITY below
@@ -736,9 +734,7 @@ const DECEL_DROP_AFTER = 2.0;   // seconds of sustained deceleration before the 
 const DECEL_DROP_CHANCE = 0.6;  // chance a ball drops once that roll happens
 const ACCEL_DROP_CHANCE = 0.01; // chance a ball drops on each accelerating click
 const STORM_RATIO = 0.85;     // fraction of MAX_VELOCITY that triggers the storm effect
-const STORM_DROP_1_AT = 6;    // seconds into the storm sound before the 1st forced ball
-const STORM_DROP_2_AT = 12;   // seconds into the storm sound before the 2nd forced ball
-const STORM_DROP_ALL_AT = 18; // seconds into the storm sound before all remaining balls drop at once
+const STORM_DROP_TIMES = [6, 9, 12, 14, 15]; // seconds into the storm sound; one forced ball at each
 const STORM_CAP_BOOST_AT = 9; // seconds into the storm sound before the speed cap doubles
 
 velocityCap = MAX_VELOCITY;
@@ -1022,15 +1018,6 @@ function triggerDrop() {
   }, 300);
 }
 
-const REMAINING_DROP_INTERVAL = 700; // ms between each ball in the "drop all remaining" chain
-
-function dropRemainingSequentially() {
-  if (chancesLeft > 0 && !gameEnded) {
-    triggerDrop();
-    setTimeout(dropRemainingSequentially, REMAINING_DROP_INTERVAL);
-  }
-}
-
 function tick(now) {
   const dt = Math.min((now - lastFrame) / 1000, 0.05);
   lastFrame = now;
@@ -1050,9 +1037,7 @@ function tick(now) {
       if (stormStartAt === null) {
         // storm sound just started (or restarted) this episode
         stormStartAt = now;
-        stormDrop7Done = false;
-        stormDrop12Done = false;
-        stormDropAllDone = false;
+        stormDropIndex = 0;
         stormCapDoubled = false;
         stormFinishNaturally = false;
         velocityCap = MAX_VELOCITY;
@@ -1065,20 +1050,18 @@ function tick(now) {
         velocity = velocityCap; // forced speed surge
       }
 
-      if (chancesLeft > 0 && !gameEnded) {
-        if (!stormDropAllDone && stormElapsed >= STORM_DROP_ALL_AT) {
-          // reached full 18s at max speed: let the storm track play out,
-          // and reveal every remaining chance one after another
-          stormDropAllDone = true;
+      if (
+        chancesLeft > 0 && !gameEnded &&
+        stormDropIndex < STORM_DROP_TIMES.length &&
+        stormElapsed >= STORM_DROP_TIMES[stormDropIndex]
+      ) {
+        const isLastScheduledDrop = stormDropIndex === STORM_DROP_TIMES.length - 1;
+        stormDropIndex += 1;
+        if (isLastScheduledDrop) {
+          // reached the final scheduled drop (15s): let the storm track play out
           stormFinishNaturally = true;
-          dropRemainingSequentially();
-        } else if (!stormDrop12Done && stormElapsed >= STORM_DROP_2_AT) {
-          stormDrop12Done = true;
-          triggerDrop();
-        } else if (!stormDrop7Done && stormElapsed >= STORM_DROP_1_AT) {
-          stormDrop7Done = true;
-          triggerDrop();
         }
+        triggerDrop();
       }
     } else {
       stormStartAt = null;
@@ -1164,9 +1147,7 @@ function newGame() {
   decelTimer = 0;
   decelRollDone = false;
   stormStartAt = null;
-  stormDrop7Done = false;
-  stormDrop12Done = false;
-  stormDropAllDone = false;
+  stormDropIndex = 0;
   stormCapDoubled = false;
   stormFinishNaturally = false;
   velocityCap = MAX_VELOCITY;
