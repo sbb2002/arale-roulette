@@ -595,6 +595,8 @@ let angle = 0;          // degrees
 let velocity = 0;       // deg / sec
 let decelTimer = 0;     // seconds spent slowing down without a new click
 let decelRollDone = false; // whether the 2s-deceleration roll already happened this episode
+let lastBallAt = performance.now(); // timestamp of the last ball drop (or game start)
+let nearMaxTimer = 0;   // seconds spent continuously near max speed
 
 const CLICK_BOOST = 130;      // deg/sec added per click
 const MAX_VELOCITY = 1100;    // deg/sec cap
@@ -604,6 +606,9 @@ const DECEL_DROP_AFTER = 2.0;   // seconds of sustained deceleration before the 
 const DECEL_DROP_CHANCE = 0.6;  // chance a ball drops once that roll happens
 const ACCEL_DROP_CHANCE = 0.01; // chance a ball drops on each accelerating click
 const STORM_RATIO = 0.85;     // fraction of MAX_VELOCITY that triggers the storm effect
+const NEAR_MAX_RATIO = 0.85;  // fraction of MAX_VELOCITY counted as "근접 최대속력"
+const NEAR_MAX_HOLD = 3.0;    // seconds continuously near max speed before a forced drop
+const NO_BALL_FORCE_AFTER = 5.0; // seconds since the last ball before the forced drop can arm
 
 let lastFrame = performance.now();
 
@@ -835,6 +840,8 @@ function triggerDrop() {
   // while this one is still being revealed
   decelTimer = 0;
   decelRollDone = false;
+  lastBallAt = performance.now();
+  nearMaxTimer = 0;
   chancesLeft -= 1;
 
   const color = drawBall();
@@ -900,19 +907,32 @@ function tick(now) {
     document.body.classList.toggle('shake', velocity >= MAX_VELOCITY - 0.01);
     updateStormSound(dt, stormShowing);
 
+    if (velocity >= MAX_VELOCITY * NEAR_MAX_RATIO) {
+      nearMaxTimer += dt;
+    } else {
+      nearMaxTimer = 0;
+    }
+
     velocity *= Math.exp(-FRICTION * dt);
     if (velocity < 3) velocity = 0;
 
     decelTimer += dt;
 
-    const aboveMinSpeed = velocity >= MAX_VELOCITY * DROP_MIN_RATIO;
-    if (chancesLeft > 0 && !gameEnded && aboveMinSpeed && !decelRollDone && decelTimer >= DECEL_DROP_AFTER) {
-      decelRollDone = true;
-      if (Math.random() < DECEL_DROP_CHANCE) {
-        triggerDrop();
+    const sinceLastBall = (now - lastBallAt) / 1000;
+    if (chancesLeft > 0 && !gameEnded && sinceLastBall >= NO_BALL_FORCE_AFTER && nearMaxTimer >= NEAR_MAX_HOLD) {
+      // guaranteed drop: no ball for a while, and max speed has been held long enough
+      triggerDrop();
+    } else {
+      const aboveMinSpeed = velocity >= MAX_VELOCITY * DROP_MIN_RATIO;
+      if (chancesLeft > 0 && !gameEnded && aboveMinSpeed && !decelRollDone && decelTimer >= DECEL_DROP_AFTER) {
+        decelRollDone = true;
+        if (Math.random() < DECEL_DROP_CHANCE) {
+          triggerDrop();
+        }
       }
     }
   } else {
+    nearMaxTimer = 0;
     storm.classList.remove('show');
     document.body.classList.remove('shake');
     updateStormSound(dt, false);
@@ -965,6 +985,8 @@ function newGame() {
   velocity = 0;
   decelTimer = 0;
   decelRollDone = false;
+  lastBallAt = performance.now();
+  nearMaxTimer = 0;
   resultColors = [];
   storm.classList.remove('show');
   renderChances();
