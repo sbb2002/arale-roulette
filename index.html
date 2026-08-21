@@ -308,6 +308,11 @@
     background: transparent;
     opacity: .35;
   }
+  .chance-dot.red { background: var(--red); border-color: var(--wood-darker); opacity: 1; }
+  .chance-dot.blue { background: var(--blue); border-color: var(--wood-darker); opacity: 1; }
+  .chance-dot.lime { background: var(--lime); border-color: var(--wood-darker); opacity: 1; }
+  .chance-dot.purple { background: var(--purple); border-color: var(--wood-darker); opacity: 1; }
+  .chance-dot.white { background: var(--paper); border-color: #cbb98f; opacity: 1; }
 
   .legend {
     display: flex;
@@ -412,6 +417,24 @@
     font-weight: 800;
     color: #c22a6a;
   }
+  .win-effort {
+    font-size: 13px;
+    color: #8a7862;
+  }
+  .effort-badge {
+    position: fixed;
+    top: 14px;
+    right: 16px;
+    padding: 6px 14px;
+    border-radius: 999px;
+    background: var(--paper);
+    border: 2px solid var(--wood-darker);
+    color: var(--frame);
+    font-size: 12px;
+    font-weight: 700;
+    box-shadow: 0 3px 8px rgba(0,0,0,.15);
+    z-index: 20;
+  }
   .win-close {
     padding: 8px 20px;
     border: none;
@@ -426,6 +449,8 @@
 <body>
 
 <h1>카겜페에서 어레일과 유노상쟝를❗ 만나자~</h1>
+
+<div class="effort-badge" id="effortBadge">현재까지 쏟아부은 노오오오력 : 0원</div>
 
 <div class="machine">
   <div class="cage">
@@ -470,6 +495,7 @@
   <div class="win-card">
     <img src="ooaddari.png" alt="당첨 축하">
     <div class="win-text">당첨을 축하합니다! 🎉</div>
+    <div class="win-effort" id="winEffort">현재까지 쏟아부은 노오오오력 : 0원</div>
     <button class="win-close" id="winClose">닫기</button>
   </div>
 </div>
@@ -518,12 +544,26 @@ const resetBtn = document.getElementById('resetBtn');
 const winOverlay = document.getElementById('winOverlay');
 const winClose = document.getElementById('winClose');
 const gameOverOverlay = document.getElementById('gameOverOverlay');
+const effortBadge = document.getElementById('effortBadge');
+const winEffort = document.getElementById('winEffort');
+
+// ---------- "노오오오력" counter: balls drawn since start / last win, x30000 ----------
+const EFFORT_PER_LOSE = 30000;
+let ballCount = 0;
+
+function updateEffortDisplay() {
+  const text = `현재까지 쏟아부은 노오오오력 : ${(ballCount * EFFORT_PER_LOSE).toLocaleString('ko-KR')}원`;
+  effortBadge.textContent = text;
+  winEffort.textContent = text;
+}
+
+let resultColors = []; // color drawn for each chance used so far, in order
 
 function renderChances() {
   chancesEl.innerHTML = '';
   for (let i = 0; i < MAX_CHANCES; i++) {
     const d = document.createElement('div');
-    d.className = 'chance-dot' + (i < MAX_CHANCES - chancesLeft ? ' used' : '');
+    d.className = i < resultColors.length ? `chance-dot ${resultColors[i]}` : 'chance-dot';
     chancesEl.appendChild(d);
   }
 }
@@ -742,10 +782,11 @@ function triggerDrop() {
   decelTimer = 0;
   decelRollDone = false;
   chancesLeft -= 1;
-  renderChances();
 
   const color = drawBall();
   const isWin = color !== 'white';
+  resultColors.push(color);
+  renderChances();
 
   if (isWin || chancesLeft <= 0) {
     gameEnded = true;
@@ -764,6 +805,8 @@ function triggerDrop() {
       msg.className = 'msg win';
       spinHint.textContent = '축하합니다! 당첨으로 게임이 종료되었습니다.';
       playWinChime();
+      ballCount += 1;
+      updateEffortDisplay();
       setTimeout(() => {
         winOverlay.classList.add('show');
       }, 500);
@@ -771,6 +814,8 @@ function triggerDrop() {
       msg.textContent = '꽝!';
       msg.className = 'msg lose';
       playLoseChime();
+      ballCount += 1;
+      updateEffortDisplay();
       if (gameEnded) {
         spinHint.textContent = '기회를 모두 사용했습니다. 새 게임을 시작해보세요.';
         playGameOverSound();
@@ -857,6 +902,7 @@ function newGame() {
   velocity = 0;
   decelTimer = 0;
   decelRollDone = false;
+  resultColors = [];
   storm.classList.remove('show');
   renderChances();
   updateCrankVisual();
@@ -869,8 +915,13 @@ function newGame() {
 }
 
 resetBtn.addEventListener('click', newGame);
-winClose.addEventListener('click', () => winOverlay.classList.remove('show'));
+winClose.addEventListener('click', () => {
+  winOverlay.classList.remove('show');
+  ballCount = 0;
+  updateEffortDisplay();
+});
 
+updateEffortDisplay();
 newGame();
 </script>
 
