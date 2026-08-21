@@ -493,7 +493,7 @@
 
 <div class="win-overlay" id="winOverlay">
   <div class="win-card">
-    <img src="ooaddari.png" alt="당첨 축하">
+    <img src="ooaddari.png" alt="당첨 축하" id="winImage">
     <div class="win-text">당첨을 축하합니다! 🎉</div>
     <div class="win-effort" id="winEffort">현재까지 쏟아부은 노오오오력 : 0원</div>
     <button class="win-close" id="winClose">닫기</button>
@@ -546,6 +546,8 @@ const winClose = document.getElementById('winClose');
 const gameOverOverlay = document.getElementById('gameOverOverlay');
 const effortBadge = document.getElementById('effortBadge');
 const winEffort = document.getElementById('winEffort');
+const winImage = document.getElementById('winImage');
+const WIN_IMAGES = ['ooaddari.png', 'ooaddari2.png'];
 
 // ---------- "노오오오력" counter: balls drawn since start / last win, x30000 ----------
 const EFFORT_PER_LOSE = 30000;
@@ -807,6 +809,7 @@ function triggerDrop() {
       playWinChime();
       ballCount += 1;
       updateEffortDisplay();
+      winImage.src = WIN_IMAGES[Math.floor(Math.random() * WIN_IMAGES.length)];
       setTimeout(() => {
         winOverlay.classList.add('show');
       }, 500);
