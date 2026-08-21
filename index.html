@@ -732,6 +732,38 @@ function updateSpinSound(dt, spinning) {
   }
 }
 
+// ---------- time-space storm sound: plays once per storm-icon appearance,
+// fades out fast if the storm ends while it's still playing ----------
+const stormSound = new Audio('timespace_strom_morn.mp3');
+stormSound.preload = 'auto';
+let stormSoundPlaying = false;
+let stormVolume = 0;
+const STORM_VOLUME_TARGET = 0.6;
+const STORM_FADE_OUT_RATE = 8; // volume/sec, fast fade-out once the storm ends
+
+function updateStormSound(dt, showing) {
+  if (showing) {
+    if (!stormSoundPlaying) {
+      stormSoundPlaying = true;
+      stormVolume = STORM_VOLUME_TARGET;
+      stormSound.currentTime = 0;
+      stormSound.volume = stormVolume;
+      stormSound.play().catch(() => {});
+    } else {
+      stormVolume = STORM_VOLUME_TARGET;
+      stormSound.volume = stormVolume;
+    }
+  } else if (stormSoundPlaying) {
+    stormVolume = Math.max(0, stormVolume - STORM_FADE_OUT_RATE * dt);
+    stormSound.volume = stormVolume;
+    if (stormVolume <= 0.001) {
+      stormSoundPlaying = false;
+      stormSound.pause();
+      stormSound.currentTime = 0;
+    }
+  }
+}
+
 // ---------- octagon shatter (all chances used up without winning) ----------
 // the octagon's own clip-path vertices, as [x%, y%] pairs going around the rim
 const OCTAGON_VERTS = [
@@ -853,8 +885,10 @@ function tick(now) {
     crankOrbit.style.transform = `rotate(${angle}deg)`;
     crank.style.transform = `rotate(${-angle}deg)`;
 
-    storm.classList.toggle('show', velocity >= MAX_VELOCITY * STORM_RATIO);
+    const stormShowing = velocity >= MAX_VELOCITY * STORM_RATIO;
+    storm.classList.toggle('show', stormShowing);
     document.body.classList.toggle('shake', velocity >= MAX_VELOCITY - 0.01);
+    updateStormSound(dt, stormShowing);
 
     velocity *= Math.exp(-FRICTION * dt);
     if (velocity < 3) velocity = 0;
@@ -871,6 +905,7 @@ function tick(now) {
   } else {
     storm.classList.remove('show');
     document.body.classList.remove('shake');
+    updateStormSound(dt, false);
   }
 
   updateSpinSound(dt, velocity > 0);
@@ -908,6 +943,10 @@ function newGame() {
   spinSound.currentTime = 0;
   spinVolume = 0;
   spinSoundPlaying = false;
+  stormSound.pause();
+  stormSound.currentTime = 0;
+  stormVolume = 0;
+  stormSoundPlaying = false;
   document.body.classList.remove('shake');
   restoreOctagon();
   refillPool();
