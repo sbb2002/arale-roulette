@@ -417,6 +417,13 @@
     font-weight: 800;
     color: #c22a6a;
   }
+  .win-bigspender {
+    display: none;
+    font-size: 16px;
+    font-weight: 800;
+    color: #b5793f;
+  }
+  .win-bigspender.show { display: block; }
   .win-effort {
     font-size: 13px;
     color: #8a7862;
@@ -495,6 +502,7 @@
   <div class="win-card">
     <img src="ooaddari.png" alt="당첨 축하" id="winImage">
     <div class="win-text">당첨을 축하합니다! 🎉</div>
+    <div class="win-bigspender" id="winBigSpender">부시로의 대주주시네요!!👍</div>
     <div class="win-effort" id="winEffort">현재까지 쏟아부은 노오오오력 : 0원</div>
     <button class="win-close" id="winClose">닫기</button>
   </div>
@@ -547,7 +555,9 @@ const gameOverOverlay = document.getElementById('gameOverOverlay');
 const effortBadge = document.getElementById('effortBadge');
 const winEffort = document.getElementById('winEffort');
 const winImage = document.getElementById('winImage');
+const winBigSpender = document.getElementById('winBigSpender');
 const WIN_IMAGES = ['ooaddari.png', 'ooaddari2.png'];
+const BIG_SPENDER_THRESHOLD = 500000;
 
 // ---------- "노오오오력" counter: balls drawn since start / last win, x30000 ----------
 const EFFORT_PER_LOSE = 30000;
@@ -810,6 +820,7 @@ function triggerDrop() {
       ballCount += 1;
       updateEffortDisplay();
       winImage.src = WIN_IMAGES[Math.floor(Math.random() * WIN_IMAGES.length)];
+      winBigSpender.classList.toggle('show', ballCount * EFFORT_PER_LOSE > BIG_SPENDER_THRESHOLD);
       setTimeout(() => {
         winOverlay.classList.add('show');
       }, 500);
@@ -914,6 +925,7 @@ function newGame() {
   msg.className = 'msg';
   spinHint.textContent = '손잡이를 여러 번 클릭해서 돌려보세요 (계속 클릭하면 더 빨리 돌아가요)';
   winOverlay.classList.remove('show');
+  winBigSpender.classList.remove('show');
   gameOverOverlay.classList.remove('show');
 }
 
