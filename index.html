@@ -1,0 +1,878 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>가라가라 추첨기</title>
+<style>
+  :root {
+    --wood-light: #d9a86c;
+    --wood-mid: #b5793f;
+    --wood-dark: #7a4e26;
+    --wood-darker: #5a3719;
+    --frame: #4a2e15;
+    --metal: #3a3a3a;
+    --paper: #f6ecd9;
+
+    --red: #d94f3d;
+    --blue: #6ec6ff;
+    --lime: #cfe04a;
+    --purple: #b06cf0;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 20px;
+    font-family: "Pretendard", "Malgun Gothic", sans-serif;
+    background: radial-gradient(circle at 50% 20%, #f3e3c3, #d8c19a 70%);
+    padding: 32px 16px;
+  }
+  /* screen-shake earthquake effect while the drum holds max rotation speed */
+  body.shake {
+    animation: earthquake .28s infinite;
+  }
+  @keyframes earthquake {
+    0%   { transform: translate(0, 0); }
+    20%  { transform: translate(-5px, 3px); }
+    40%  { transform: translate(4px, -4px); }
+    60%  { transform: translate(-3px, -3px); }
+    80%  { transform: translate(5px, 2px); }
+    100% { transform: translate(0, 0); }
+  }
+  h1 {
+    margin: 0;
+    font-size: 26px;
+    color: var(--frame);
+  }
+
+  /* ---------- machine ---------- */
+  .machine {
+    position: relative;
+    width: 420px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .cage {
+    position: relative;
+    width: 420px;
+    height: 380px;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+  }
+
+  /* octagonal drum - large, nearly touching the stand below */
+  .octagon-wrap {
+    position: relative;
+    width: 360px;
+    height: 360px;
+  }
+  .octagon {
+    position: absolute;
+    inset: 0;
+    clip-path: polygon(
+      30% 0%, 70% 0%, 100% 30%, 100% 70%,
+      70% 100%, 30% 100%, 0% 70%, 0% 30%
+    );
+    background:
+      repeating-linear-gradient(
+        100deg,
+        var(--wood-light) 0px,
+        var(--wood-mid) 10px,
+        var(--wood-light) 20px,
+        var(--wood-dark) 32px
+      );
+    box-shadow: inset 0 0 40px rgba(0,0,0,.45);
+    border: 8px solid var(--wood-darker);
+    cursor: pointer;
+  }
+  .octagon::before {
+    content: "";
+    position: absolute;
+    inset: 14px;
+    clip-path: polygon(
+      30% 0%, 70% 0%, 100% 30%, 100% 70%,
+      70% 100%, 30% 100%, 0% 70%, 0% 30%
+    );
+    background:
+      repeating-linear-gradient(0deg, rgba(0,0,0,.12) 0 2px, transparent 2px 18px),
+      repeating-linear-gradient(90deg, rgba(0,0,0,.12) 0 2px, transparent 2px 18px);
+    opacity: .5;
+  }
+  /* octagon shatters into 8 pie-slice fragments when all chances run out */
+  .octagon, .hub, .crank-orbit {
+    transition: opacity .35s ease;
+  }
+  .shatter-frag {
+    position: absolute;
+    inset: 0;
+    background:
+      repeating-linear-gradient(
+        100deg,
+        var(--wood-light) 0px,
+        var(--wood-mid) 10px,
+        var(--wood-light) 20px,
+        var(--wood-dark) 32px
+      );
+    box-shadow: inset 0 0 20px rgba(0,0,0,.4);
+    transition: transform 1s cubic-bezier(.2,.8,.3,1), opacity 1s ease;
+    z-index: 5;
+  }
+
+  /* time-space storm effect: fades in when the drum is near max speed,
+     spins together with it, and fades back out as it slows down */
+  .storm {
+    position: absolute;
+    inset: 0;
+    clip-path: polygon(
+      30% 0%, 70% 0%, 100% 30%, 100% 70%,
+      70% 100%, 30% 100%, 0% 70%, 0% 30%
+    );
+    opacity: 0;
+    transition: opacity .5s ease;
+    pointer-events: none;
+    z-index: 1;
+    mix-blend-mode: screen;
+  }
+  .storm.show { opacity: .55; }
+  .storm img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  .hub {
+    position: absolute;
+    left: 50%; top: 50%;
+    width: 40px; height: 40px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, #666, var(--metal) 70%);
+    transform: translate(-50%,-50%);
+    box-shadow: 0 0 6px rgba(0,0,0,.5);
+    z-index: 2;
+  }
+
+  /* handle mounted on the drum's rim: this layer rotates together with
+     the drum (revolves around the center); the handle graphic inside it
+     counter-rotates so it never spins in place, only travels in a circle */
+  .crank-orbit {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+  }
+  .crank {
+    position: absolute;
+    left: 50%;
+    top: 0px;
+    width: 34px;
+    height: 34px;
+    margin-left: -17px;
+    margin-top: -17px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, var(--wood-light), var(--wood-dark) 75%);
+    border: 3px solid var(--wood-darker);
+    box-shadow: 0 3px 6px rgba(0,0,0,.4), inset 0 0 6px rgba(0,0,0,.3);
+    cursor: pointer;
+    pointer-events: auto;
+  }
+  .crank::after {
+    /* top-view center bolt */
+    content: "";
+    position: absolute;
+    left: 50%; top: 50%;
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    background: var(--metal);
+    transform: translate(-50%,-50%);
+  }
+  .crank.disabled { cursor: not-allowed; filter: grayscale(.4) brightness(.9); }
+
+  /* stand / frame */
+  .stand {
+    width: 300px;
+    height: 70px;
+    position: relative;
+    margin-top: -8px;
+  }
+  .stand::before, .stand::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    width: 16px;
+    height: 100%;
+    background: linear-gradient(180deg, var(--wood-mid), var(--wood-darker));
+    border-radius: 3px;
+  }
+  .stand::before { left: 40px; transform: rotate(8deg); transform-origin: top; }
+  .stand::after { right: 40px; transform: rotate(-8deg); transform-origin: top; }
+  .base {
+    position: absolute;
+    bottom: 0;
+    left: 10px;
+    right: 10px;
+    height: 16px;
+    background: linear-gradient(180deg, var(--wood-dark), var(--frame));
+    border-radius: 6px;
+    box-shadow: 0 6px 10px rgba(0,0,0,.25);
+  }
+
+  /* chute + tray */
+  .chute {
+    position: absolute;
+    left: 50%;
+    bottom: 6px;
+    transform: translateX(-50%);
+    width: 26px;
+    height: 30px;
+    background: linear-gradient(180deg, var(--wood-darker), var(--frame));
+    clip-path: polygon(20% 0, 80% 0, 100% 100%, 0 100%);
+    z-index: 3;
+  }
+  .tray {
+    width: 120px;
+    height: 26px;
+    background: linear-gradient(180deg, var(--wood-mid), var(--wood-darker));
+    border-radius: 0 0 10px 10px;
+    margin-top: -2px;
+    box-shadow: inset 0 4px 6px rgba(0,0,0,.35);
+  }
+
+  /* ball that physically bounces around the page after it drops */
+  .phys-ball {
+    position: fixed;
+    left: 0;
+    top: 0;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    box-shadow: inset -4px -4px 8px rgba(0,0,0,.25), inset 4px 4px 8px rgba(255,255,255,.5), 0 4px 8px rgba(0,0,0,.3);
+    z-index: 50;
+    pointer-events: none;
+    opacity: 1;
+    transition: opacity .6s ease;
+  }
+
+  /* ---------- result panel ---------- */
+  .result-window {
+    width: 260px;
+    min-height: 100px;
+    background: var(--paper);
+    border: 3px solid var(--wood-darker);
+    border-radius: 12px;
+    box-shadow: 0 6px 14px rgba(0,0,0,.2);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 14px;
+  }
+  .ball {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    box-shadow: inset -6px -6px 10px rgba(0,0,0,.2), inset 6px 6px 10px rgba(255,255,255,.5);
+    opacity: 0;
+    transform: scale(.3);
+    transition: all .3s cubic-bezier(.3,1.4,.4,1);
+  }
+  .ball.show { opacity: 1; transform: scale(1); }
+  .ball.white { background: var(--paper); border: 2px solid #cbb98f; }
+  .ball.red { background: var(--red); }
+  .ball.blue { background: var(--blue); }
+  .ball.lime { background: var(--lime); }
+  .ball.purple { background: var(--purple); }
+
+  .msg { font-size: 19px; font-weight: 700; min-height: 24px; color: #5a3d1e; }
+  .msg.win { color: #c22a6a; }
+  .msg.lose { color: #8a7862; }
+
+  /* chances */
+  .chances {
+    display: flex;
+    gap: 8px;
+  }
+  .chance-dot {
+    width: 16px; height: 16px;
+    border-radius: 50%;
+    background: var(--wood-mid);
+    border: 2px solid var(--wood-darker);
+  }
+  .chance-dot.used {
+    background: transparent;
+    opacity: .35;
+  }
+
+  .legend {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    justify-content: center;
+    font-size: 12px;
+    color: var(--frame);
+  }
+  .legend span { display: flex; align-items: center; gap: 5px; }
+  .dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
+  .dot.red { background: var(--red); }
+  .dot.blue { background: var(--blue); }
+  .dot.lime { background: var(--lime); }
+  .dot.purple { background: var(--purple); }
+  .dot.white { background: var(--paper); border: 1px solid #cbb98f; }
+
+  .hint {
+    font-size: 13px;
+    color: #6b5535;
+    text-align: center;
+  }
+
+  button.reset {
+    position: relative;
+    z-index: 9; /* stays above the game-over dimming overlay */
+    padding: 8px 18px;
+    font-size: 13px;
+    font-weight: 700;
+    border: 2px solid var(--wood-darker);
+    border-radius: 999px;
+    background: var(--wood-mid);
+    color: #fff;
+    cursor: pointer;
+  }
+
+  /* ---------- game over dimming overlay (all chances used, no win) ---------- */
+  .gameover-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, .72);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .8s ease;
+    z-index: 8;
+  }
+  .gameover-overlay.show {
+    opacity: 1;
+  }
+  .gameover-text {
+    font-size: 26px;
+    font-weight: 800;
+    color: #f0e3c8;
+    letter-spacing: .05em;
+    text-shadow: 0 2px 10px rgba(0,0,0,.6);
+  }
+
+  /* ---------- win celebration overlay ---------- */
+  .win-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(40, 24, 8, .55);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .9s ease;
+    z-index: 10;
+  }
+  .win-overlay.show {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  .win-card {
+    background: #fff;
+    border-radius: 20px;
+    padding: 32px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 18px;
+    box-shadow: 0 20px 50px rgba(0,0,0,.4);
+    transform: scale(.9);
+    transition: transform .9s cubic-bezier(.3,1.3,.4,1);
+    max-width: 92vw;
+    max-height: 92vh;
+  }
+  .win-overlay.show .win-card { transform: scale(1); }
+  .win-card img {
+    max-width: min(640px, 85vw);
+    max-height: 65vh;
+    width: 100%;
+    border-radius: 12px;
+    object-fit: contain;
+  }
+  .win-text {
+    font-size: 28px;
+    font-weight: 800;
+    color: #c22a6a;
+  }
+  .win-close {
+    padding: 8px 20px;
+    border: none;
+    border-radius: 999px;
+    background: var(--wood-mid);
+    color: #fff;
+    font-weight: 700;
+    cursor: pointer;
+  }
+</style>
+</head>
+<body>
+
+<h1>가라가라 추첨기</h1>
+
+<div class="machine">
+  <div class="cage">
+    <div class="octagon-wrap" id="octagonWrap">
+      <div class="octagon" id="octagon"></div>
+      <div class="storm" id="storm">
+        <img src="timespace_storm.jpg" alt="">
+      </div>
+      <div class="hub"></div>
+      <div class="crank-orbit" id="crankOrbit">
+        <div class="crank" id="crank"></div>
+      </div>
+    </div>
+    <div class="chute" id="chute"></div>
+  </div>
+  <div class="stand">
+    <div class="base"></div>
+  </div>
+  <div class="tray"></div>
+</div>
+
+<div class="hint" id="spinHint">손잡이를 여러 번 클릭해서 돌려보세요 (계속 클릭하면 더 빨리 돌아가요)</div>
+
+<div class="result-window">
+  <div class="ball" id="ball"></div>
+  <div class="msg" id="msg">기회 5번, 도전해보세요!</div>
+</div>
+
+<div class="chances" id="chances"></div>
+
+<div class="legend">
+  <span><i class="dot red"></i>빨강</span>
+  <span><i class="dot blue"></i>하늘</span>
+  <span><i class="dot lime"></i>연두</span>
+  <span><i class="dot purple"></i>보라</span>
+  <span><i class="dot white"></i>꽝</span>
+</div>
+
+<button class="reset" id="resetBtn">새 게임 시작 (기회 5회 초기화)</button>
+
+<div class="win-overlay" id="winOverlay">
+  <div class="win-card">
+    <img src="ooaddari.png" alt="당첨 축하">
+    <div class="win-text">당첨을 축하합니다! 🎉</div>
+    <button class="win-close" id="winClose">닫기</button>
+  </div>
+</div>
+
+<div class="gameover-overlay" id="gameOverOverlay">
+  <div class="gameover-text">기회를 모두 사용했습니다</div>
+</div>
+
+<script>
+const TOTAL = 300;
+const WIN_COLORS = { red: 8, blue: 8, lime: 7, purple: 7 };
+const WIN_TOTAL = Object.values(WIN_COLORS).reduce((a, b) => a + b, 0); // 30
+const LOSE_TOTAL = TOTAL - WIN_TOTAL; // 270
+const MAX_CHANCES = 5;
+
+let pool = [];
+let chancesLeft = MAX_CHANCES;
+let gameEnded = false; // true once a winning ball is drawn, or chances run out
+
+function refillPool() {
+  pool = [];
+  for (const [color, count] of Object.entries(WIN_COLORS)) {
+    for (let i = 0; i < count; i++) pool.push(color);
+  }
+  for (let i = 0; i < LOSE_TOTAL; i++) pool.push('white');
+}
+
+function drawBall() {
+  const idx = Math.floor(Math.random() * pool.length);
+  return pool.splice(idx, 1)[0];
+}
+
+// ---------- DOM ----------
+const octagonWrap = document.getElementById('octagonWrap');
+const octagon = document.getElementById('octagon');
+const hub = document.querySelector('.hub');
+const storm = document.getElementById('storm');
+const crankOrbit = document.getElementById('crankOrbit');
+const crank = document.getElementById('crank');
+const chute = document.getElementById('chute');
+const ball = document.getElementById('ball');
+const msg = document.getElementById('msg');
+const spinHint = document.getElementById('spinHint');
+const chancesEl = document.getElementById('chances');
+const resetBtn = document.getElementById('resetBtn');
+const winOverlay = document.getElementById('winOverlay');
+const winClose = document.getElementById('winClose');
+const gameOverOverlay = document.getElementById('gameOverOverlay');
+
+function renderChances() {
+  chancesEl.innerHTML = '';
+  for (let i = 0; i < MAX_CHANCES; i++) {
+    const d = document.createElement('div');
+    d.className = 'chance-dot' + (i < MAX_CHANCES - chancesLeft ? ' used' : '');
+    chancesEl.appendChild(d);
+  }
+}
+
+// ---------- physics ----------
+let angle = 0;          // degrees
+let velocity = 0;       // deg / sec
+let decelTimer = 0;     // seconds spent slowing down without a new click
+let decelRollDone = false; // whether the 2s-deceleration roll already happened this episode
+
+const CLICK_BOOST = 130;      // deg/sec added per click
+const MAX_VELOCITY = 1100;    // deg/sec cap
+const FRICTION = 0.6;         // per-second exponential decay rate
+const DROP_MIN_RATIO = 0.10;    // drops only possible above this fraction of max speed
+const DECEL_DROP_AFTER = 2.0;   // seconds of sustained deceleration before the roll
+const DECEL_DROP_CHANCE = 0.6;  // chance a ball drops once that roll happens
+const ACCEL_DROP_CHANCE = 0.01; // chance a ball drops on each accelerating click
+const STORM_RATIO = 0.85;     // fraction of MAX_VELOCITY that triggers the storm effect
+
+let lastFrame = performance.now();
+
+function canSpin() {
+  return !gameEnded && chancesLeft > 0;
+}
+
+function updateCrankVisual() {
+  crank.classList.toggle('disabled', !canSpin());
+  octagon.style.cursor = canSpin() ? 'pointer' : 'not-allowed';
+}
+
+// ---------- ball that physically bounces around the page ----------
+const COLOR_HEX = {
+  red: '#d94f3d',
+  blue: '#6ec6ff',
+  lime: '#cfe04a',
+  purple: '#b06cf0',
+  white: '#f6ecd9',
+};
+const GRAVITY = 2200;        // px/s^2
+const RESTITUTION = 0.58;    // bounce energy retained
+const FLOOR_FRICTION = 0.82; // horizontal speed retained per bounce
+const BALL_SIZE = 24;
+
+let physicsBalls = [];
+
+function spawnPhysicsBall(color) {
+  const rect = octagon.getBoundingClientRect();
+  const originX = rect.left + rect.width / 2 - BALL_SIZE / 2;
+  const originY = rect.top + rect.height / 2 - BALL_SIZE / 2;
+
+  const el = document.createElement('div');
+  el.className = 'phys-ball';
+  el.style.background = COLOR_HEX[color];
+  if (color === 'white') el.style.border = '2px solid #cbb98f';
+  document.body.appendChild(el);
+
+  const launchAngle = Math.random() * Math.PI * 2;
+  const launchSpeed = 320 + Math.random() * 380;
+
+  physicsBalls.push({
+    el,
+    x: originX,
+    y: originY,
+    vx: Math.cos(launchAngle) * launchSpeed,
+    vy: Math.sin(launchAngle) * launchSpeed,
+    spawnTime: performance.now(),
+  });
+}
+
+function updatePhysicsBalls(dt) {
+  const floorY = window.innerHeight - BALL_SIZE;
+  const rightX = window.innerWidth - BALL_SIZE;
+
+  for (let i = physicsBalls.length - 1; i >= 0; i--) {
+    const b = physicsBalls[i];
+    b.vy += GRAVITY * dt;
+    b.x += b.vx * dt;
+    b.y += b.vy * dt;
+
+    if (b.y >= floorY) {
+      b.y = floorY;
+      b.vy = -b.vy * RESTITUTION;
+      b.vx *= FLOOR_FRICTION;
+      if (Math.abs(b.vy) < 70) b.vy = 0;
+    }
+    if (b.x <= 0) { b.x = 0; b.vx = -b.vx * RESTITUTION; }
+    if (b.x >= rightX) { b.x = rightX; b.vx = -b.vx * RESTITUTION; }
+    if (b.y <= 0) { b.y = 0; b.vy = -b.vy * RESTITUTION; }
+
+    b.el.style.transform = `translate(${b.x}px, ${b.y}px)`;
+
+    const age = (performance.now() - b.spawnTime) / 1000;
+    const settled = b.vy === 0 && Math.abs(b.vx) < 8;
+    if ((settled && age > 1.2) || age > 6) {
+      b.el.style.opacity = '0';
+      setTimeout(() => b.el.remove(), 600);
+      physicsBalls.splice(i, 1);
+    }
+  }
+}
+
+// ---------- result sounds ----------
+const winSound = new Audio('ooaddari_ring.mp3');
+winSound.preload = 'auto';
+const loseSound = new Audio('not_ooaddari_ring.mp3');
+loseSound.preload = 'auto';
+const gameOverSound = new Audio('game_over.mp3');
+gameOverSound.preload = 'auto';
+
+function playWinChime() {
+  winSound.currentTime = 0;
+  winSound.play().catch(() => {});
+}
+
+function playLoseChime() {
+  loseSound.currentTime = 0;
+  loseSound.play().catch(() => {});
+}
+
+function playGameOverSound() {
+  gameOverSound.currentTime = 0;
+  gameOverSound.play().catch(() => {});
+}
+
+// ---------- spinning drum loop sound (fades out fast once it stops) ----------
+const spinSound = new Audio('garagra_sound.mp3');
+spinSound.loop = true;
+spinSound.preload = 'auto';
+spinSound.volume = 0;
+let spinSoundPlaying = false;
+let spinVolume = 0;
+const SPIN_VOLUME_TARGET = 0.55;
+const SPIN_FADE_IN_RATE = 4;   // volume/sec, quick ramp-up when spinning starts
+const SPIN_FADE_OUT_RATE = 7;  // volume/sec, fast fade-out once it stops
+
+function updateSpinSound(dt, spinning) {
+  const target = spinning ? SPIN_VOLUME_TARGET : 0;
+  const rate = spinning ? SPIN_FADE_IN_RATE : SPIN_FADE_OUT_RATE;
+
+  if (spinVolume < target) {
+    spinVolume = Math.min(target, spinVolume + rate * dt);
+  } else if (spinVolume > target) {
+    spinVolume = Math.max(target, spinVolume - rate * dt);
+  }
+  spinSound.volume = spinVolume;
+
+  if (spinning && !spinSoundPlaying) {
+    spinSoundPlaying = true;
+    spinSound.play().catch(() => {});
+  } else if (!spinning && spinSoundPlaying && spinVolume <= 0.001) {
+    spinSoundPlaying = false;
+    spinSound.pause();
+    spinSound.currentTime = 0;
+  }
+}
+
+// ---------- octagon shatter (all chances used up without winning) ----------
+// the octagon's own clip-path vertices, as [x%, y%] pairs going around the rim
+const OCTAGON_VERTS = [
+  [30, 0], [70, 0], [100, 30], [100, 70],
+  [70, 100], [30, 100], [0, 70], [0, 30],
+];
+let shatterFrags = [];
+
+function shatterOctagon() {
+  octagon.style.opacity = '0';
+  hub.style.opacity = '0';
+  crankOrbit.style.opacity = '0';
+  storm.classList.remove('show');
+
+  for (let i = 0; i < OCTAGON_VERTS.length; i++) {
+    const a = OCTAGON_VERTS[i];
+    const b = OCTAGON_VERTS[(i + 1) % OCTAGON_VERTS.length];
+    const frag = document.createElement('div');
+    frag.className = 'shatter-frag';
+    frag.style.clipPath = `polygon(50% 50%, ${a[0]}% ${a[1]}%, ${b[0]}% ${b[1]}%)`;
+    octagonWrap.appendChild(frag);
+    shatterFrags.push(frag);
+
+    // midpoint of this slice's outer edge gives the outward burst direction
+    const midX = (a[0] + b[0]) / 2 - 50;
+    const midY = (a[1] + b[1]) / 2 - 50;
+    const len = Math.hypot(midX, midY) || 1;
+    const dist = 180 + Math.random() * 160;
+    const dx = (midX / len) * dist;
+    const dy = (midY / len) * dist;
+    const rot = (Math.random() - 0.5) * 360;
+    const delay = Math.random() * 120;
+
+    requestAnimationFrame(() => {
+      setTimeout(() => {
+        frag.style.transform = `translate(${dx}px, ${dy}px) rotate(${rot}deg)`;
+        frag.style.opacity = '0';
+      }, delay);
+    });
+  }
+
+  setTimeout(() => {
+    shatterFrags.forEach(f => f.remove());
+    shatterFrags = [];
+  }, 1300);
+}
+
+function restoreOctagon() {
+  shatterFrags.forEach(f => f.remove());
+  shatterFrags = [];
+  octagon.style.opacity = '1';
+  hub.style.opacity = '1';
+  crankOrbit.style.opacity = '1';
+}
+
+function triggerDrop() {
+  // resolve the outcome and lock the game state synchronously, before any
+  // animation delay, so the spinning drum can't sneak in a second drop
+  // while this one is still being revealed
+  decelTimer = 0;
+  decelRollDone = false;
+  chancesLeft -= 1;
+  renderChances();
+
+  const color = drawBall();
+  const isWin = color !== 'white';
+
+  if (isWin || chancesLeft <= 0) {
+    gameEnded = true;
+    velocity = 0; // stop the drum immediately so no further rolls can fire
+  }
+  updateCrankVisual();
+
+  spawnPhysicsBall(color);
+
+  ball.classList.remove('show');
+  setTimeout(() => {
+    ball.className = 'ball show ' + color;
+
+    if (isWin) {
+      msg.textContent = '당첨! 🎉';
+      msg.className = 'msg win';
+      spinHint.textContent = '축하합니다! 당첨으로 게임이 종료되었습니다.';
+      playWinChime();
+      setTimeout(() => {
+        winOverlay.classList.add('show');
+      }, 500);
+    } else {
+      msg.textContent = '꽝!';
+      msg.className = 'msg lose';
+      playLoseChime();
+      if (gameEnded) {
+        spinHint.textContent = '기회를 모두 사용했습니다. 새 게임을 시작해보세요.';
+        playGameOverSound();
+        shatterOctagon();
+        gameOverOverlay.classList.add('show');
+      } else {
+        spinHint.textContent = `다시 손잡이를 돌려보세요! (남은 기회 ${chancesLeft}번)`;
+      }
+    }
+  }, 300);
+}
+
+function tick(now) {
+  const dt = Math.min((now - lastFrame) / 1000, 0.05);
+  lastFrame = now;
+
+  if (velocity > 0) {
+    angle = (angle + velocity * dt) % 360;
+    octagon.style.transform = `rotate(${angle}deg)`;
+    storm.style.transform = `rotate(${angle}deg)`;
+    crankOrbit.style.transform = `rotate(${angle}deg)`;
+    crank.style.transform = `rotate(${-angle}deg)`;
+
+    storm.classList.toggle('show', velocity >= MAX_VELOCITY * STORM_RATIO);
+    document.body.classList.toggle('shake', velocity >= MAX_VELOCITY - 0.01);
+
+    velocity *= Math.exp(-FRICTION * dt);
+    if (velocity < 3) velocity = 0;
+
+    decelTimer += dt;
+
+    const aboveMinSpeed = velocity >= MAX_VELOCITY * DROP_MIN_RATIO;
+    if (chancesLeft > 0 && !gameEnded && aboveMinSpeed && !decelRollDone && decelTimer >= DECEL_DROP_AFTER) {
+      decelRollDone = true;
+      if (Math.random() < DECEL_DROP_CHANCE) {
+        triggerDrop();
+      }
+    }
+  } else {
+    storm.classList.remove('show');
+    document.body.classList.remove('shake');
+  }
+
+  updateSpinSound(dt, velocity > 0);
+  updatePhysicsBalls(dt);
+
+  requestAnimationFrame(tick);
+}
+requestAnimationFrame(tick);
+
+function crankClick() {
+  if (!canSpin()) {
+    spinHint.textContent = gameEnded
+      ? '게임이 종료되었습니다. 새 게임을 시작해보세요.'
+      : '기회를 모두 사용했습니다. 새 게임을 시작해보세요.';
+    return;
+  }
+  velocity = Math.min(velocity + CLICK_BOOST, MAX_VELOCITY);
+  decelTimer = 0;
+  decelRollDone = false;
+  spinHint.textContent = '계속 클릭해서 가속하고, 손을 떼면 감속하다 구슬이 떨어져요';
+
+  const aboveMinSpeed = velocity >= MAX_VELOCITY * DROP_MIN_RATIO;
+  if (chancesLeft > 0 && !gameEnded && aboveMinSpeed && Math.random() < ACCEL_DROP_CHANCE) {
+    triggerDrop();
+  }
+}
+
+crank.addEventListener('click', crankClick);
+octagon.addEventListener('click', crankClick);
+
+function newGame() {
+  physicsBalls.forEach(b => b.el.remove());
+  physicsBalls = [];
+  spinSound.pause();
+  spinSound.currentTime = 0;
+  spinVolume = 0;
+  spinSoundPlaying = false;
+  document.body.classList.remove('shake');
+  restoreOctagon();
+  refillPool();
+  chancesLeft = MAX_CHANCES;
+  gameEnded = false;
+  velocity = 0;
+  decelTimer = 0;
+  decelRollDone = false;
+  storm.classList.remove('show');
+  renderChances();
+  updateCrankVisual();
+  ball.classList.remove('show');
+  msg.textContent = '기회 5번, 도전해보세요!';
+  msg.className = 'msg';
+  spinHint.textContent = '손잡이를 여러 번 클릭해서 돌려보세요 (계속 클릭하면 더 빨리 돌아가요)';
+  winOverlay.classList.remove('show');
+  gameOverOverlay.classList.remove('show');
+}
+
+resetBtn.addEventListener('click', newGame);
+winClose.addEventListener('click', () => winOverlay.classList.remove('show'));
+
+newGame();
+</script>
+
+</body>
+</html>
