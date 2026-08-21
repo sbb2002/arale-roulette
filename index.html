@@ -595,8 +595,11 @@ let angle = 0;          // degrees
 let velocity = 0;       // deg / sec
 let decelTimer = 0;     // seconds spent slowing down without a new click
 let decelRollDone = false; // whether the 2s-deceleration roll already happened this episode
-let lastBallAt = performance.now(); // timestamp of the last ball drop (or game start)
-let nearMaxTimer = 0;   // seconds spent continuously near max speed
+let stormStartAt = null;    // timestamp when the storm sound most recently started playing
+let stormDrop7Done = false;  // whether the 7s-into-storm forced ball already dropped
+let stormDrop12Done = false; // whether the 12s-into-storm forced ball already dropped
+let stormCapDoubled = false; // whether the 9s-into-storm speed-cap doubling already happened
+let velocityCap = 0;         // current max velocity (doubles mid-storm); set to MAX_VELOCITY below
 
 const CLICK_BOOST = 130;      // deg/sec added per click
 const MAX_VELOCITY = 1100;    // deg/sec cap
@@ -606,9 +609,12 @@ const DECEL_DROP_AFTER = 2.0;   // seconds of sustained deceleration before the 
 const DECEL_DROP_CHANCE = 0.6;  // chance a ball drops once that roll happens
 const ACCEL_DROP_CHANCE = 0.01; // chance a ball drops on each accelerating click
 const STORM_RATIO = 0.85;     // fraction of MAX_VELOCITY that triggers the storm effect
-const NEAR_MAX_RATIO = 0.85;  // fraction of MAX_VELOCITY counted as "근접 최대속력"
-const NEAR_MAX_HOLD = 3.0;    // seconds continuously near max speed before a forced drop
-const NO_BALL_FORCE_AFTER = 5.0; // seconds since the last ball before the forced drop can arm
+const STORM_DROP_1_AT = 7;    // seconds into the storm sound before the 1st forced ball
+const STORM_DROP_2_AT = 12;   // seconds into the storm sound before the 2nd forced ball
+const STORM_DROP_ALL_AT = 18; // seconds into the storm sound before all remaining balls drop at once
+const STORM_CAP_BOOST_AT = 9; // seconds into the storm sound before the speed cap doubles
+
+velocityCap = MAX_VELOCITY;
 
 let lastFrame = performance.now();
 
@@ -840,8 +846,6 @@ function triggerDrop() {
   // while this one is still being revealed
   decelTimer = 0;
   decelRollDone = false;
-  lastBallAt = performance.now();
-  nearMaxTimer = 0;
   chancesLeft -= 1;
 
   const color = drawBall();
@@ -904,13 +908,41 @@ function tick(now) {
 
     const stormShowing = velocity >= MAX_VELOCITY * STORM_RATIO;
     storm.classList.toggle('show', stormShowing);
-    document.body.classList.toggle('shake', velocity >= MAX_VELOCITY - 0.01);
+    document.body.classList.toggle('shake', velocity >= velocityCap - 0.01);
     updateStormSound(dt, stormShowing);
 
-    if (velocity >= MAX_VELOCITY * NEAR_MAX_RATIO) {
-      nearMaxTimer += dt;
+    if (stormShowing) {
+      if (stormStartAt === null) {
+        // storm sound just started (or restarted) this episode
+        stormStartAt = now;
+        stormDrop7Done = false;
+        stormDrop12Done = false;
+        stormCapDoubled = false;
+        velocityCap = MAX_VELOCITY;
+      }
+      const stormElapsed = (now - stormStartAt) / 1000;
+
+      if (!stormCapDoubled && stormElapsed >= STORM_CAP_BOOST_AT) {
+        stormCapDoubled = true;
+        velocityCap = MAX_VELOCITY * 2;
+        velocity = velocityCap; // forced speed surge
+      }
+
+      if (chancesLeft > 0 && !gameEnded) {
+        if (stormElapsed >= STORM_DROP_ALL_AT) {
+          // guaranteed: dump every remaining chance at once
+          while (chancesLeft > 0 && !gameEnded) triggerDrop();
+        } else if (!stormDrop12Done && stormElapsed >= STORM_DROP_2_AT) {
+          stormDrop12Done = true;
+          triggerDrop();
+        } else if (!stormDrop7Done && stormElapsed >= STORM_DROP_1_AT) {
+          stormDrop7Done = true;
+          triggerDrop();
+        }
+      }
     } else {
-      nearMaxTimer = 0;
+      stormStartAt = null;
+      velocityCap = MAX_VELOCITY;
     }
 
     velocity *= Math.exp(-FRICTION * dt);
@@ -918,21 +950,16 @@ function tick(now) {
 
     decelTimer += dt;
 
-    const sinceLastBall = (now - lastBallAt) / 1000;
-    if (chancesLeft > 0 && !gameEnded && sinceLastBall >= NO_BALL_FORCE_AFTER && nearMaxTimer >= NEAR_MAX_HOLD) {
-      // guaranteed drop: no ball for a while, and max speed has been held long enough
-      triggerDrop();
-    } else {
-      const aboveMinSpeed = velocity >= MAX_VELOCITY * DROP_MIN_RATIO;
-      if (chancesLeft > 0 && !gameEnded && aboveMinSpeed && !decelRollDone && decelTimer >= DECEL_DROP_AFTER) {
-        decelRollDone = true;
-        if (Math.random() < DECEL_DROP_CHANCE) {
-          triggerDrop();
-        }
+    const aboveMinSpeed = velocity >= MAX_VELOCITY * DROP_MIN_RATIO;
+    if (chancesLeft > 0 && !gameEnded && aboveMinSpeed && !decelRollDone && decelTimer >= DECEL_DROP_AFTER) {
+      decelRollDone = true;
+      if (Math.random() < DECEL_DROP_CHANCE) {
+        triggerDrop();
       }
     }
   } else {
-    nearMaxTimer = 0;
+    stormStartAt = null;
+    velocityCap = MAX_VELOCITY;
     storm.classList.remove('show');
     document.body.classList.remove('shake');
     updateStormSound(dt, false);
@@ -952,7 +979,7 @@ function crankClick() {
       : '기회를 모두 사용했습니다. 새 게임을 시작해보세요.';
     return;
   }
-  velocity = Math.min(velocity + CLICK_BOOST, MAX_VELOCITY);
+  velocity = Math.min(velocity + CLICK_BOOST, velocityCap);
   decelTimer = 0;
   decelRollDone = false;
   spinHint.textContent = '계속 클릭해서 가속하고, 손을 떼면 감속하다 구슬이 떨어져요';
@@ -985,8 +1012,11 @@ function newGame() {
   velocity = 0;
   decelTimer = 0;
   decelRollDone = false;
-  lastBallAt = performance.now();
-  nearMaxTimer = 0;
+  stormStartAt = null;
+  stormDrop7Done = false;
+  stormDrop12Done = false;
+  stormCapDoubled = false;
+  velocityCap = MAX_VELOCITY;
   resultColors = [];
   storm.classList.remove('show');
   renderChances();
