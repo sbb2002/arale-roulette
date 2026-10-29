@@ -14,6 +14,12 @@
     --metal: #3a3a3a;
     --paper: #f6ecd9;
 
+    /* machine body: soft lavender-tinted white that sits well on the pink/blue background */
+    --body-white: #fbfaff;
+    --body-soft: #ece9f7;
+    --body-edge: #cdc8e3;
+    --body-shade: #a29cc4;
+
     --red: #d94f3d;
     --blue: #6ec6ff;
     --lime: #cfe04a;
@@ -21,6 +27,48 @@
   }
   * { box-sizing: border-box; }
   html, body { overflow-x: hidden; }
+  html { background: #fff8eb; }
+  /* side margins: smooth, saturated diagonal rainbow, fading to blue toward the bottom */
+  html::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -2;
+    background: linear-gradient(105deg,
+      #ff1a1a 0%, #e61fb4 10%, #a21fe6 20%, #2a4bff 32%, #00c8ff 42%,
+      #00f0b0 50%, #3dff2a 60%, #d8ff00 72%, #ffb000 84%, #ff2a1a 100%);
+    pointer-events: none;
+  }
+  html::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    background: linear-gradient(180deg, rgba(255, 119, 136, 0) 0%, rgba(255, 119, 136, .12) 35%, rgba(34, 136, 221, .35) 100%);
+    pointer-events: none;
+  }
+  /* floating decorations (pattern ported from mewtype-scheduler): pink -> blue vertical gradient shapes */
+  #bgdeco { position: fixed; inset: 0; z-index: -1; pointer-events: none; overflow: hidden; }
+  #bgdeco svg { display: block; width: 100%; height: 100%; }
+  #bgdeco .bgd-pink { stop-color: #ff7788; }
+  #bgdeco .bgd-blue { stop-color: #2288dd; }
+  #bgdeco .bgd-shape { opacity: .75; }
+  /* corner mascot popping out from the bottom-right */
+  .popper {
+    position: fixed;
+    right: -4vmin;
+    bottom: -6vmin;
+    width: clamp(160px, 26vmin, 300px);
+    z-index: 1;
+    pointer-events: none;
+    transform-origin: 100% 100%;
+    transform: rotate(-8deg);
+    animation: pop-out .7s cubic-bezier(.2, 1.4, .4, 1) .3s backwards;
+  }
+  @keyframes pop-out {
+    from { transform: translate(60%, 60%) rotate(18deg) scale(.6); }
+  }
+  @media (prefers-reduced-motion: reduce) { .popper { animation: none; } }
   body {
     margin: 0;
     width: 100%;
@@ -31,27 +79,28 @@
     justify-content: center;
     gap: 20px;
     font-family: "Pretendard", "Malgun Gothic", sans-serif;
-    background: radial-gradient(circle at 50% 20%, #f3e3c3, #d8c19a 70%);
+    background:
+      linear-gradient(rgba(255, 248, 235, .38), rgba(255, 248, 235, .38)) center top / auto 100% no-repeat fixed,
+      url("background.jpg") center top / auto 100% no-repeat fixed;
     padding: 32px 16px;
   }
-  /* screen-shake earthquake effect while the drum holds max rotation speed */
-  body.shake {
-    animation: earthquake .28s infinite;
+  /* shake: the body (and its fixed background) stays still; each top-level piece
+     jitters on its own, with a random amplitude, speed and direction set in JS */
+  body.shake > :not(script):not(.popper):not(.win-overlay):not(#bgdeco) {
+    animation: jitter var(--sd, .28s) ease-in-out infinite alternate var(--sdir, normal);
   }
-  @keyframes earthquake {
-    0%   { transform: translate(0, 0); }
-    20%  { transform: translate(-5px, 3px); }
-    40%  { transform: translate(4px, -4px); }
-    60%  { transform: translate(-3px, -3px); }
-    80%  { transform: translate(5px, 2px); }
-    100% { transform: translate(0, 0); }
+  @keyframes jitter {
+    0%   { transform: translate(calc(var(--sx, 4px) * -1), calc(var(--sy, 3px) * -1)) rotate(calc(var(--sr, 0deg) * -1)); }
+    100% { transform: translate(var(--sx, 4px), var(--sy, 3px)) rotate(var(--sr, 0deg)); }
   }
   h1 {
     margin: 0;
     font-size: clamp(18px, 5vw, 26px);
     color: var(--frame);
     text-align: center;
-    padding: 0 70px;
+    padding: 8px 70px;
+    border-radius: 999px;
+    background: rgba(255, 248, 235, .88);
   }
 
   /* ---------- machine ---------- */
@@ -77,7 +126,10 @@
     position: relative;
     width: 85.71%;
     aspect-ratio: 1;
+    /* clip-path would cut off a box-shadow, so the drum's shadow is cast from the wrapper */
+    filter: drop-shadow(0 8px 10px rgba(60, 40, 120, .35));
   }
+  /* the octagon itself is the outline colour; the ::before inset 8px is the white face */
   .octagon {
     position: absolute;
     inset: 0;
@@ -85,30 +137,19 @@
       30% 0%, 70% 0%, 100% 30%, 100% 70%,
       70% 100%, 30% 100%, 0% 70%, 0% 30%
     );
-    background:
-      repeating-linear-gradient(
-        100deg,
-        var(--wood-light) 0px,
-        var(--wood-mid) 10px,
-        var(--wood-light) 20px,
-        var(--wood-dark) 32px
-      );
-    box-shadow: inset 0 0 40px rgba(0,0,0,.45);
-    border: 8px solid var(--wood-darker);
+    background: var(--body-shade);
     cursor: pointer;
   }
   .octagon::before {
     content: "";
     position: absolute;
-    inset: 14px;
+    inset: 8px;
     clip-path: polygon(
       30% 0%, 70% 0%, 100% 30%, 100% 70%,
       70% 100%, 30% 100%, 0% 70%, 0% 30%
     );
-    background:
-      repeating-linear-gradient(0deg, rgba(0,0,0,.12) 0 2px, transparent 2px 18px),
-      repeating-linear-gradient(90deg, rgba(0,0,0,.12) 0 2px, transparent 2px 18px);
-    opacity: .5;
+    background: radial-gradient(circle at 35% 28%, var(--body-white), var(--body-soft) 80%);
+    box-shadow: inset 0 0 30px rgba(90, 70, 150, .22);
   }
   /* octagon shatters into 8 pie-slice fragments when all chances run out */
   .octagon, .hub, .crank-orbit {
@@ -118,14 +159,8 @@
     position: absolute;
     inset: 0;
     background:
-      repeating-linear-gradient(
-        100deg,
-        var(--wood-light) 0px,
-        var(--wood-mid) 10px,
-        var(--wood-light) 20px,
-        var(--wood-dark) 32px
-      );
-    box-shadow: inset 0 0 20px rgba(0,0,0,.4);
+      radial-gradient(circle at 35% 28%, var(--body-white), var(--body-soft) 80%);
+    box-shadow: inset 0 0 20px rgba(90, 70, 150, .25);
     transition: transform 1s cubic-bezier(.2,.8,.3,1), opacity 1s ease;
     z-index: 5;
   }
@@ -143,9 +178,9 @@
     transition: opacity .5s ease;
     pointer-events: none;
     z-index: 1;
-    mix-blend-mode: screen;
   }
-  .storm.show { opacity: .55; }
+  /* normal blending: "screen" vanishes on the white drum face */
+  .storm.show { opacity: .42; }
   .storm img {
     width: 100%;
     height: 100%;
@@ -272,9 +307,9 @@
     margin-left: -17px;
     margin-top: -17px;
     border-radius: 50%;
-    background: radial-gradient(circle at 35% 30%, var(--wood-light), var(--wood-dark) 75%);
-    border: 3px solid var(--wood-darker);
-    box-shadow: 0 3px 6px rgba(0,0,0,.4), inset 0 0 6px rgba(0,0,0,.3);
+    background: radial-gradient(circle at 35% 30%, var(--body-white), var(--body-edge) 75%);
+    border: 3px solid var(--body-shade);
+    box-shadow: 0 3px 6px rgba(60, 40, 120, .3), inset 0 0 6px rgba(90, 70, 150, .2);
     cursor: pointer;
     pointer-events: auto;
   }
@@ -303,20 +338,25 @@
     top: 0;
     width: 16px;
     height: 100%;
-    background: linear-gradient(180deg, var(--wood-mid), var(--wood-darker));
+    background: linear-gradient(180deg, var(--body-white), var(--body-edge));
+    z-index: 0; /* both legs stay behind the base plate */
+    border: 2px solid var(--body-shade);
     border-radius: 3px;
+    box-shadow: 3px 4px 6px rgba(60, 40, 120, .3);
   }
   .stand::before { left: 40px; transform: rotate(8deg); transform-origin: top; }
   .stand::after { right: 40px; transform: rotate(-8deg); transform-origin: top; }
   .base {
+    z-index: 1;
     position: absolute;
     bottom: 0;
     left: 10px;
     right: 10px;
     height: 16px;
-    background: linear-gradient(180deg, var(--wood-dark), var(--frame));
+    background: linear-gradient(180deg, var(--body-soft), var(--body-edge));
+    border: 2px solid var(--body-shade);
     border-radius: 6px;
-    box-shadow: 0 6px 10px rgba(0,0,0,.25);
+    box-shadow: 0 7px 10px rgba(60, 40, 120, .4);
   }
 
   /* chute + tray */
@@ -327,17 +367,19 @@
     transform: translateX(-50%);
     width: 26px;
     height: 30px;
-    background: linear-gradient(180deg, var(--wood-darker), var(--frame));
+    background: linear-gradient(180deg, var(--body-shade), #6f6894);
     clip-path: polygon(20% 0, 80% 0, 100% 100%, 0 100%);
     z-index: 3;
   }
   .tray {
     width: 28.57%;
     height: 26px;
-    background: linear-gradient(180deg, var(--wood-mid), var(--wood-darker));
+    background: linear-gradient(180deg, var(--body-soft), var(--body-edge));
+    border: 2px solid var(--body-shade);
+    border-top: none;
     border-radius: 0 0 10px 10px;
     margin-top: -2px;
-    box-shadow: inset 0 4px 6px rgba(0,0,0,.35);
+    box-shadow: inset 0 4px 6px rgba(60, 40, 120, .3), 0 6px 9px rgba(60, 40, 120, .35);
   }
 
   /* ball that physically bounces around the page after it drops */
@@ -359,7 +401,7 @@
   .result-window {
     width: min(260px, 100%);
     min-height: 100px;
-    background: var(--paper);
+    background: #fff;
     border: 3px solid var(--wood-darker);
     border-radius: 12px;
     box-shadow: 0 6px 14px rgba(0,0,0,.2);
@@ -394,6 +436,9 @@
   .chances {
     display: flex;
     gap: 8px;
+    padding: 6px 12px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, .92);
   }
   .chance-dot {
     width: 16px; height: 16px;
@@ -418,6 +463,9 @@
     justify-content: center;
     font-size: 12px;
     color: var(--frame);
+    padding: 6px 14px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, .92);
   }
   .legend span { display: flex; align-items: center; gap: 5px; }
   .dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
@@ -431,6 +479,9 @@
     font-size: 13px;
     color: #6b5535;
     text-align: center;
+    padding: 6px 16px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, .92);
   }
 
   button.reset {
@@ -554,11 +605,27 @@
     font-weight: 700;
     cursor: pointer;
   }
+  .win-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 10px;
+  }
+  .win-invite {
+    padding: 8px 20px;
+    border-radius: 999px;
+    background: linear-gradient(135deg, #ff7788, #2288dd);
+    color: #fff;
+    font-weight: 700;
+    text-decoration: none;
+  }
 </style>
 </head>
 <body>
 
-<h1>카겜페에서 어레일과 유노상쟝를❗ 만나자~</h1>
+<div id="bgdeco" aria-hidden="true"></div>
+
+<h1>일윅에서 어레일과 유노상쟝를❗ 만나자~</h1>
 
 <div class="effort-badge" id="effortBadge">현재까지 쏟아부은 노오오오력 : 0원</div>
 
@@ -608,7 +675,10 @@
     <div class="win-text">당첨을 축하합니다! 🎉</div>
     <div class="win-bigspender" id="winBigSpender">부시로의 대주주시네요!!👍</div>
     <div class="win-effort" id="winEffort">현재까지 쏟아부은 노오오오력 : 0원</div>
-    <button class="win-close" id="winClose">닫기</button>
+    <div class="win-actions">
+      <a class="win-invite" href="https://x.com/BUSHIASIA_KR/status/2115730928844816521?a=uC9Jq4dgNc-RZz-vKK0&amp;s=20" target="_blank" rel="noopener noreferrer">초대장 수락</a>
+      <button class="win-close" id="winClose">닫기</button>
+    </div>
   </div>
 </div>
 
@@ -721,8 +791,9 @@ let velocity = 0;       // deg / sec
 let decelTimer = 0;     // seconds spent slowing down without a new click
 let decelRollDone = false; // whether the 2s-deceleration roll already happened this episode
 let stormStartAt = null;    // timestamp when the storm sound most recently started playing
-let stormDropIndex = 0;      // how many of STORM_DROP_TIMES have already fired this storm episode
-let stormCapDoubled = false; // whether the 9s-into-storm speed-cap doubling already happened
+let surgeActive = false;     // true from STORM_SURGE_AT until the guaranteed win
+let floodSpawned = 0;        // flood balls spawned so far this surge
+let floodCarry = 0;          // fractional spawn accumulator
 let stormFinishNaturally = false; // once true, let the storm mp3 play out instead of fading it early
 let velocityCap = 0;         // current max velocity (doubles mid-storm); set to MAX_VELOCITY below
 
@@ -734,8 +805,14 @@ const DECEL_DROP_AFTER = 2.0;   // seconds of sustained deceleration before the 
 const DECEL_DROP_CHANCE = 0.6;  // chance a ball drops once that roll happens
 const ACCEL_DROP_CHANCE = 0.01; // chance a ball drops on each accelerating click
 const STORM_RATIO = 0.85;     // fraction of MAX_VELOCITY that triggers the storm effect
-const STORM_DROP_TIMES = [6, 9, 12, 14, 15]; // seconds into the storm sound; one forced ball at each
-const STORM_CAP_BOOST_AT = 9; // seconds into the storm sound before the speed cap doubles
+// storm timeline (seconds since reaching storm speed): nothing drops until the surge,
+// then the drum locks at 3x speed with no input and balls flood out, and the
+// run always ends with a guaranteed win at STORM_WIN_AT
+const STORM_SURGE_AT = 10;
+const STORM_WIN_AT = 15;
+const SURGE_SPEED_MULT = 3;
+const FLOOD_SCREEN_FRACTION = 0.2; // share of the screen the flood balls should fill
+const FLOOD_MAX_BALLS = 900;
 
 velocityCap = MAX_VELOCITY;
 
@@ -765,7 +842,7 @@ const BALL_SIZE = 24;
 
 let physicsBalls = [];
 
-function spawnPhysicsBall(color) {
+function spawnPhysicsBall(color, flood = false) {
   const rect = octagon.getBoundingClientRect();
   const originX = rect.left + rect.width / 2 - BALL_SIZE / 2;
   const originY = rect.top + rect.height / 2 - BALL_SIZE / 2;
@@ -777,7 +854,7 @@ function spawnPhysicsBall(color) {
   document.body.appendChild(el);
 
   const launchAngle = Math.random() * Math.PI * 2;
-  const launchSpeed = 320 + Math.random() * 380;
+  const launchSpeed = flood ? 500 + Math.random() * 700 : 320 + Math.random() * 380;
 
   physicsBalls.push({
     el,
@@ -786,15 +863,29 @@ function spawnPhysicsBall(color) {
     vx: Math.cos(launchAngle) * launchSpeed,
     vy: Math.sin(launchAngle) * launchSpeed,
     spawnTime: performance.now(),
+    keep: flood, // flood balls stay until the surge ends
+    // each flood ball rests at its own height inside the bottom band, so the pile fills that share of the screen
+    floorY: flood ? window.innerHeight - BALL_SIZE - Math.random() * (window.innerHeight * FLOOD_SCREEN_FRACTION - BALL_SIZE) : null,
   });
 }
 
+function spawnFloodBall() {
+  const r = Math.random();
+  const color = r < .12 ? ['red', 'blue', 'lime', 'purple'][Math.floor(Math.random() * 4)] : 'white';
+  spawnPhysicsBall(color, true);
+}
+
+function releaseFloodBalls() {
+  for (const b of physicsBalls) b.keep = false;
+}
+
 function updatePhysicsBalls(dt) {
-  const floorY = window.innerHeight - BALL_SIZE;
+  const baseFloorY = window.innerHeight - BALL_SIZE;
   const rightX = window.innerWidth - BALL_SIZE;
 
   for (let i = physicsBalls.length - 1; i >= 0; i--) {
     const b = physicsBalls[i];
+    const floorY = b.floorY ?? baseFloorY;
     b.vy += GRAVITY * dt;
     b.x += b.vx * dt;
     b.y += b.vy * dt;
@@ -813,11 +904,177 @@ function updatePhysicsBalls(dt) {
 
     const age = (performance.now() - b.spawnTime) / 1000;
     const settled = b.vy === 0 && Math.abs(b.vx) < 8;
-    if ((settled && age > 1.2) || age > 6) {
+    if (!b.keep && ((settled && age > 1.2) || age > 6)) {
       b.el.style.opacity = '0';
       setTimeout(() => b.el.remove(), 600);
       physicsBalls.splice(i, 1);
     }
+  }
+}
+
+// ---------- floating background decorations ----------
+// Ported from mewtype-scheduler (bgdeco.js / bglogic.js): every shape moves in its own random
+// direction at its own speed, bounces off the walls, collides elastically with the others and
+// picks up spin from glancing hits. Here the whole field's speed follows the drum: slow at rest,
+// easing up once the drum is accelerating, and holding top speed while the drum does.
+const BGD_NS = 'http://www.w3.org/2000/svg';
+const BGD_KINDS = ['ring', 'tri', 'wave', 'dot', 'gem'];
+const BGD_SPOTS = [[.08,.07],[.92,.10],[.05,.33],[.95,.40],[.09,.60],[.91,.66],[.50,.95],[.20,.90],[.80,.92],[.05,.82],[.96,.83]];
+const BGD_REST_SPEED = 0.025; // shapes' cruising speed at rest, in short-side lengths per second
+const BGD_SPEED_START = 0.3;  // drum speed ratio where the speed-up begins
+const BGD_SPEED_MAX = 24;     // speed multiplier at top drum speed
+const BGD_SPEED_EASE = 1.6;   // 1/sec, how quickly the field's speed follows its target
+const BGD_VEL_EASE = 3;       // 1/sec, how quickly each shape's velocity follows the field speed
+const bgdEl = document.getElementById('bgdeco');
+const bgdReduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+let bgdItems = [];
+let bgdBodies = [];
+let bgdSpeed = 1;
+
+function bgdSv(tag, attrs, parent) {
+  const n = document.createElementNS(BGD_NS, tag);
+  for (const k in attrs) n.setAttribute(k, attrs[k]);
+  if (parent) parent.appendChild(n);
+  return n;
+}
+
+function bgdStops(grad) {
+  bgdSv('stop', { offset: '0', class: 'bgd-pink' }, grad);
+  bgdSv('stop', { offset: '0.6', class: 'bgd-pink' }, grad);
+  bgdSv('stop', { offset: '1', class: 'bgd-blue' }, grad);
+}
+
+function bgdShape(it, gradId, parent) {
+  const { x, y, u, kind, ang } = it;
+  const common = { transform: `rotate(${ang} ${x} ${y})`, class: 'bgd-shape' };
+  const line = { ...common, fill: 'none', stroke: `url(#${gradId})`, 'stroke-width': Math.max(3.5, u * 0.2), 'stroke-linecap': 'round', 'stroke-linejoin': 'round' };
+  if (kind === 'ring') return bgdSv('circle', { ...line, cx: x, cy: y, r: u }, parent);
+  if (kind === 'tri') return bgdSv('polygon', { ...line, points: `${x},${y - u} ${x + u},${y + u * .8} ${x - u},${y + u * .8}` }, parent);
+  if (kind === 'wave') return bgdSv('path', { ...line, d: `M${x - u * 1.8} ${y} q${u * .9} ${-u * 1.1} ${u * 1.8} 0 t${u * 1.8} 0` }, parent);
+  if (kind === 'dot') return bgdSv('circle', { ...common, cx: x, cy: y, r: u * .45, fill: `url(#${gradId})` }, parent);
+  return bgdSv('rect', { ...common, x: x - u * .75, y: y - u * .75, width: u * 1.5, height: u * 1.5, rx: 3, fill: `url(#${gradId})` }, parent);
+}
+
+function bgdMakeBody(it, W, H) {
+  const sc = Math.min(W, H);
+  return { cx: it.x, cy: it.y, r: it.u * 1.25, W, H, m: sc * 0.04, sc, ox: 0, oy: 0, vx: 0, vy: 0, th: 0, w: 0, base: 1 };
+}
+
+// one physics step: walls (80% bounce, spin on impact), then circle-approximated elastic collisions
+function bgdStep(bodies, dt) {
+  const clampW = (w) => Math.max(-10, Math.min(10, w));
+  for (const b of bodies) {
+    b.w *= Math.exp(-0.7 * dt); // spin lingers longer than movement
+    b.ox += b.vx * dt; b.oy += b.vy * dt; b.th += b.w * dt;
+    const spin = (v) => { b.w += (Math.random() < .5 ? -1 : 1) * Math.min(10, v / b.sc * 4); };
+    const x = b.cx + b.ox, y = b.cy + b.oy;
+    if (x < b.m) { b.ox = b.m - b.cx; spin(Math.abs(b.vx)); b.vx = Math.abs(b.vx) * 0.8; }
+    else if (x > b.W - b.m) { b.ox = b.W - b.m - b.cx; spin(Math.abs(b.vx)); b.vx = -Math.abs(b.vx) * 0.8; }
+    if (y < b.m) { b.oy = b.m - b.cy; spin(Math.abs(b.vy)); b.vy = Math.abs(b.vy) * 0.8; }
+    else if (y > b.H - b.m) { b.oy = b.H - b.m - b.cy; spin(Math.abs(b.vy)); b.vy = -Math.abs(b.vy) * 0.8; }
+  }
+  for (let i = 0; i < bodies.length; i++) for (let j = i + 1; j < bodies.length; j++) {
+    const p = bodies[i], q = bodies[j];
+    const dx = q.cx + q.ox - p.cx - p.ox, dy = q.cy + q.oy - p.cy - p.oy, d = Math.hypot(dx, dy), min = p.r + q.r;
+    if (d >= min || d < 0.01) continue;
+    const nx = dx / d, ny = dy / d, push = (min - d) / 2;
+    p.ox -= nx * push; p.oy -= ny * push; q.ox += nx * push; q.oy += ny * push;
+    const rvx = q.vx - p.vx, rvy = q.vy - p.vy, vn = rvx * nx + rvy * ny;
+    if (vn < 0) { // only while approaching
+      const jn = -(1 + 0.85) * vn / 2;
+      p.vx -= jn * nx; p.vy -= jn * ny; q.vx += jn * nx; q.vy += jn * ny;
+      const vt = rvx * -ny + rvy * nx; // tangential speed: glancing hits add spin
+      p.w = clampW(p.w + vt / p.r * 0.5); q.w = clampW(q.w + vt / q.r * 0.5);
+    }
+  }
+}
+
+function buildBgDeco() {
+  const W = window.innerWidth, H = window.innerHeight;
+  const u = Math.min(W, H) * 0.04;
+  // seeded PRNG so the layout is the same on every load
+  let seed = 21;
+  const rand = () => { seed = (seed + 0x6D2B79F5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+
+  bgdEl.innerHTML = '';
+  const svg = bgdSv('svg', { viewBox: `0 0 ${W} ${H}`, preserveAspectRatio: 'none' }, bgdEl);
+  const defs = bgdSv('defs', {}, svg);
+  bgdItems = [];
+  bgdBodies = [];
+
+  BGD_SPOTS.forEach(([fx, fy], i) => {
+    const it = { x: fx * W, y: fy * H, u, kind: BGD_KINDS[i % 5], ang: Math.round(rand() * 360) };
+    const gradId = `bgd-g${i}`;
+    const grad = bgdSv('linearGradient', { id: gradId, gradientUnits: 'userSpaceOnUse', x1: it.x, y1: it.y - u * 1.9, x2: it.x, y2: it.y + u * 1.9, gradientTransform: `rotate(${-it.ang} ${it.x} ${it.y})` }, defs);
+    bgdStops(grad);
+    const g = bgdSv('g', {}, svg);
+    bgdShape(it, gradId, g);
+
+    // each shape cruises in its own random direction at its own speed
+    const body = bgdMakeBody(it, W, H);
+    const dir = rand() * Math.PI * 2;
+    body.base = (0.5 + rand()) * BGD_REST_SPEED * body.sc;
+    body.vx = Math.cos(dir) * body.base;
+    body.vy = Math.sin(dir) * body.base;
+    bgdItems.push({ g, grad, it });
+    bgdBodies.push(body);
+  });
+
+  // long zigzag scribble along the bottom
+  const gradId = 'bgd-line';
+  const grad = bgdSv('linearGradient', { id: gradId, gradientUnits: 'userSpaceOnUse', x1: 0, y1: 0, x2: 0, y2: H }, defs);
+  bgdStops(grad);
+  const x0 = W * .06, y0 = H * .97, x1 = W * .94, y1 = H * .92, N = 25;
+  let d = '';
+  for (let i = 0; i < N; i++) {
+    const t = i / (N - 1);
+    const off = (i % 2 ? 1 : -1) * H * .012 * (.35 + .65 * rand());
+    d += `${i ? 'L' : 'M'}${(x0 + (x1 - x0) * t).toFixed(1)} ${(y0 + (y1 - y0) * t + off).toFixed(1)} `;
+  }
+  bgdSv('path', { d, fill: 'none', stroke: `url(#${gradId})`, 'stroke-width': 5, 'stroke-linecap': 'round', 'stroke-linejoin': 'round', class: 'bgd-shape' }, svg);
+}
+
+function updateBgDeco(dt, vel) {
+  if (bgdReduce) return;
+  const ratio = Math.min(vel / MAX_VELOCITY, 1);
+  const k = Math.min(Math.max((ratio - BGD_SPEED_START) / (1 - BGD_SPEED_START), 0), 1);
+  const target = 1 + (BGD_SPEED_MAX - 1) * k * k * (3 - 2 * k); // smoothstep
+  bgdSpeed += (target - bgdSpeed) * Math.min(1, BGD_SPEED_EASE * dt);
+
+  // ease every shape's speed toward base * field speed, keeping its current direction
+  for (const b of bgdBodies) {
+    const mag = Math.hypot(b.vx, b.vy);
+    if (mag > 0.01) {
+      const want = mag + (b.base * bgdSpeed - mag) * Math.min(1, BGD_VEL_EASE * dt);
+      b.vx *= want / mag; b.vy *= want / mag;
+    }
+  }
+  // sub-step so fast shapes can't tunnel through each other or the walls
+  const steps = Math.max(1, Math.ceil(bgdSpeed / 6));
+  for (let i = 0; i < steps; i++) bgdStep(bgdBodies, dt / steps);
+
+  bgdBodies.forEach((b, i) => {
+    const { g, grad, it } = bgdItems[i];
+    const deg = b.th * 180 / Math.PI;
+    g.setAttribute('transform', `translate(${b.ox.toFixed(1)} ${b.oy.toFixed(1)}) rotate(${deg.toFixed(1)} ${it.x} ${it.y})`);
+    grad.setAttribute('gradientTransform', `rotate(${(-it.ang - deg).toFixed(1)} ${it.x} ${it.y})`); // keep pink on top, blue below
+  });
+}
+
+buildBgDeco();
+let bgdResizeT = 0;
+window.addEventListener('resize', () => { clearTimeout(bgdResizeT); bgdResizeT = setTimeout(buildBgDeco, 200); });
+
+// ---------- shake: random amplitude / speed / direction per top-level element ----------
+function randomizeShake() {
+  const rnd = (min, max) => min + Math.random() * (max - min);
+  const sign = () => (Math.random() < .5 ? -1 : 1);
+  for (const el of document.body.children) {
+    el.style.setProperty('--sx', (sign() * rnd(1.5, 6)).toFixed(1) + 'px');
+    el.style.setProperty('--sy', (sign() * rnd(1.5, 6)).toFixed(1) + 'px');
+    el.style.setProperty('--sr', (sign() * rnd(0, .6)).toFixed(2) + 'deg');
+    el.style.setProperty('--sd', rnd(.08, .35).toFixed(2) + 's');
+    el.style.setProperty('--sdir', Math.random() < .5 ? 'normal' : 'alternate-reverse');
   }
 }
 
@@ -963,7 +1220,7 @@ function restoreOctagon() {
   crankOrbit.style.opacity = '1';
 }
 
-function triggerDrop() {
+function triggerDrop(forceColor) {
   // resolve the outcome and lock the game state synchronously, before any
   // animation delay, so the spinning drum can't sneak in a second drop
   // while this one is still being revealed
@@ -971,7 +1228,14 @@ function triggerDrop() {
   decelRollDone = false;
   chancesLeft -= 1;
 
-  const color = drawBall();
+  let color;
+  if (forceColor) {
+    color = forceColor;
+    const i = pool.indexOf(color);
+    if (i >= 0) pool.splice(i, 1);
+  } else {
+    color = drawBall();
+  }
   const isWin = color !== 'white';
   resultColors.push(color);
   renderChances();
@@ -1031,37 +1295,44 @@ function tick(now) {
 
     const stormShowing = velocity >= MAX_VELOCITY * STORM_RATIO;
     storm.classList.toggle('show', stormShowing);
-    document.body.classList.toggle('shake', velocity >= velocityCap - 0.01);
+    const shaking = velocity >= velocityCap - 0.01;
+    if (shaking && !document.body.classList.contains('shake')) randomizeShake();
+    document.body.classList.toggle('shake', shaking);
 
     if (stormShowing) {
       if (stormStartAt === null) {
         // storm sound just started (or restarted) this episode
         stormStartAt = now;
-        stormDropIndex = 0;
-        stormCapDoubled = false;
+        surgeActive = false;
         stormFinishNaturally = false;
         velocityCap = MAX_VELOCITY;
       }
       const stormElapsed = (now - stormStartAt) / 1000;
 
-      if (!stormCapDoubled && stormElapsed >= STORM_CAP_BOOST_AT) {
-        stormCapDoubled = true;
-        velocityCap = MAX_VELOCITY * 2;
-        velocity = velocityCap; // forced speed surge
+      if (!surgeActive && stormElapsed >= STORM_SURGE_AT) {
+        surgeActive = true;
+        floodSpawned = 0;
+        floodCarry = 0;
+        velocityCap = MAX_VELOCITY * SURGE_SPEED_MULT;
       }
 
-      if (
-        chancesLeft > 0 && !gameEnded &&
-        stormDropIndex < STORM_DROP_TIMES.length &&
-        stormElapsed >= STORM_DROP_TIMES[stormDropIndex]
-      ) {
-        const isLastScheduledDrop = stormDropIndex === STORM_DROP_TIMES.length - 1;
-        stormDropIndex += 1;
-        if (isLastScheduledDrop) {
-          // reached the final scheduled drop (15s): let the storm track play out
-          stormFinishNaturally = true;
+      if (surgeActive) {
+        // flood: spread the balls evenly over the remaining time, no input needed
+        const area = window.innerWidth * window.innerHeight * FLOOD_SCREEN_FRACTION;
+        const target = Math.min(FLOOD_MAX_BALLS, Math.ceil(area * 1.5 / (Math.PI * (BALL_SIZE / 2) ** 2)));
+        floodCarry += (target / (STORM_WIN_AT - STORM_SURGE_AT)) * dt;
+        while (floodCarry >= 1 && floodSpawned < target) {
+          floodCarry -= 1;
+          floodSpawned += 1;
+          spawnFloodBall();
         }
-        triggerDrop();
+
+        if (stormElapsed >= STORM_WIN_AT && chancesLeft > 0 && !gameEnded) {
+          surgeActive = false;
+          stormFinishNaturally = true;
+          releaseFloodBalls();
+          triggerDrop(['red', 'blue', 'lime', 'purple'][Math.floor(Math.random() * 4)]);
+        }
       }
     } else {
       stormStartAt = null;
@@ -1070,8 +1341,12 @@ function tick(now) {
 
     updateStormSound(dt, stormShowing || stormFinishNaturally);
 
-    velocity *= Math.exp(-FRICTION * dt);
-    if (velocity < 3) velocity = 0;
+    if (surgeActive) {
+      velocity = velocityCap; // locked at surge speed, ignores friction
+    } else {
+      velocity *= Math.exp(-FRICTION * dt);
+      if (velocity < 3) velocity = 0;
+    }
 
     decelTimer += dt;
 
@@ -1088,6 +1363,7 @@ function tick(now) {
     }
   } else {
     stormStartAt = null;
+    surgeActive = false;
     velocityCap = MAX_VELOCITY;
     storm.classList.remove('show');
     document.body.classList.remove('shake');
@@ -1098,6 +1374,7 @@ function tick(now) {
 
   updateSpinSound(dt, velocity > 0);
   updatePhysicsBalls(dt);
+  updateBgDeco(dt, velocity);
 
   requestAnimationFrame(tick);
 }
@@ -1147,8 +1424,9 @@ function newGame() {
   decelTimer = 0;
   decelRollDone = false;
   stormStartAt = null;
-  stormDropIndex = 0;
-  stormCapDoubled = false;
+  surgeActive = false;
+  floodSpawned = 0;
+  floodCarry = 0;
   stormFinishNaturally = false;
   velocityCap = MAX_VELOCITY;
   resultColors = [];
@@ -1176,5 +1454,6 @@ updateEffortDisplay();
 newGame();
 </script>
 
+<img class="popper" src="matchamne.png" alt="">
 </body>
 </html>
