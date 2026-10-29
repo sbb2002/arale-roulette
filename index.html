@@ -945,6 +945,7 @@ const BGD_SPOTS = [[.08,.07],[.92,.10],[.05,.33],[.95,.40],[.09,.60],[.91,.66],[
 const BGD_REST_SPEED = 0.025; // shapes' cruising speed at rest, in short-side lengths per second
 const BGD_SPEED_START = 0.3;  // drum speed ratio where the speed-up begins
 const BGD_SPEED_MAX = 24;     // speed multiplier at top drum speed
+const BGD_SURGE_MULT = 2;     // extra multiplier while the forced-win surge is running
 const BGD_SPEED_EASE = 1.6;   // 1/sec, how quickly the field's speed follows its target
 const BGD_VEL_EASE = 3;       // 1/sec, how quickly each shape's velocity follows the field speed
 const bgdEl = document.getElementById('bgdeco');
@@ -1060,7 +1061,7 @@ function updateBgDeco(dt, vel) {
   if (bgdReduce) return;
   const ratio = Math.min(vel / MAX_VELOCITY, 1);
   const k = Math.min(Math.max((ratio - BGD_SPEED_START) / (1 - BGD_SPEED_START), 0), 1);
-  const target = 1 + (BGD_SPEED_MAX - 1) * k * k * (3 - 2 * k); // smoothstep
+  const target = (1 + (BGD_SPEED_MAX - 1) * k * k * (3 - 2 * k)) * (surgeActive ? BGD_SURGE_MULT : 1); // smoothstep, doubled in the forced-win surge
   bgdSpeed += (target - bgdSpeed) * Math.min(1, BGD_SPEED_EASE * dt);
 
   // ease every shape's speed toward base * field speed, keeping its current direction
